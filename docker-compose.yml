@@ -1,0 +1,14 @@
+# Local self-contained stack: trains the models at build, then serves the API +
+# dashboard. `docker compose up` then open http://localhost:8000
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ds_models:/app/models
+      - ds_data:/app/data
+
+volumes:
+  ds_models:
+  ds_data:

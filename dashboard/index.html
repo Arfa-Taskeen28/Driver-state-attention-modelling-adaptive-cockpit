@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Driver-State &amp; Adaptive Cockpit</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root{--bg:#0b0f17;--panel:#141a24;--line:#232c3a;--text:#e6edf3;--muted:#93a1b5;
+    --alert:#39d353;--drowsy:#f5a623;--critical:#ff4d4f;--accent:#58a6ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding:22px}
+  h1{font-size:22px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:3px}
+  .row{display:flex;gap:16px;flex-wrap:wrap}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .grow{flex:1;min-width:320px}
+  button{background:#1d2734;color:var(--text);border:1px solid var(--line);
+    border-radius:9px;padding:7px 13px;font-size:13px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .badge{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:10px;
+    font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.04em}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .muted{color:var(--muted)}
+  .kpi{display:flex;gap:22px;flex-wrap:wrap;margin-top:4px}
+  .kpi div b{display:block;font-size:20px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px}
+  .card{background:#0f1620;border:1px solid var(--line);border-radius:11px;padding:11px 12px}
+  .card .lab{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .card .val{font-size:16px;font-weight:700;margin-top:3px}
+  .bar{height:6px;background:#0b1119;border-radius:4px;margin-top:7px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  .pill{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  h3{margin:0 0 10px;font-size:15px}
+  .break{background:rgba(255,77,79,.12);border:1px solid var(--critical);border-radius:10px;
+    padding:10px 12px;color:#ffd7d7;margin-top:10px;font-weight:600}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+const COLORS = {alert:'#39d353', drowsy:'#f5a623', critical:'#ff4d4f'};
+const cap = s => s ? s[0].toUpperCase()+s.slice(1) : s;
+
+function Timeline({data}){
+  const ref = useRef(); const chart = useRef();
+  useEffect(()=>{
+    if(!data) return;
+    const ctx = ref.current.getContext('2d');
+    if(chart.current) chart.current.destroy();
+    chart.current = new Chart(ctx,{type:'line',
+      data:{labels:data.times_min,datasets:[
+        {label:'Predicted fatigue', data:data.pred_score, borderColor:'#58a6ff',
+         backgroundColor:'rgba(88,166,255,.12)', fill:true, tension:.3, pointRadius:0, borderWidth:2},
+        {label:'Ground-truth fatigue', data:data.gt_fatigue, borderColor:'#93a1b5',
+         borderDash:[5,4], tension:.3, pointRadius:0, borderWidth:1.5},
+        {label:'PERCLOS (eye closure)', data:data.signals.perclos, borderColor:'#f5a623',
+         tension:.3, pointRadius:0, borderWidth:1, hidden:true},
+      ]},
+      options:{responsive:true, animation:false,
+        scales:{y:{min:0,max:1,grid:{color:'#1c2431'},ticks:{color:'#93a1b5'}},
+                x:{grid:{color:'#1c2431'},ticks:{color:'#93a1b5',maxTicksLimit:10,
+                   callback:(v,i)=>data.times_min[i]+'m'}}},
+        plugins:{legend:{labels:{color:'#e6edf3',boxWidth:12}}}}});
+    return ()=>chart.current && chart.current.destroy();
+  },[data]);
+  return <canvas ref={ref} height="150"></canvas>;
+}
+
+function Bar({v,color}){return <div className="bar"><i style={{width:(v*100)+'%',background:color}}/></div>;}
+
+function Cockpit({policy}){
+  const p = policy;
+  return (<div>
+    <div className="cards">
+      <div className="card"><div className="lab">FCW lead time</div><div className="val">{p.fcw_lead_time_s}s</div></div>
+      <div className="card"><div className="lab">Following gap</div><div className="val">{p.following_distance_s}s</div></div>
+      <div className="card"><div className="lab">Lane-keeping</div><div className="val">{cap(p.lane_keep_strictness)}</div></div>
+      <div className="card"><div className="lab">Alert tone</div><div className="val">{cap(p.alert_tone)}</div>
+        <Bar v={p.alert_volume} color="#58a6ff"/></div>
+      <div className="card"><div className="lab">Display brightness</div><div className="val">{Math.round(p.display_brightness*100)}%</div>
+        <Bar v={p.display_brightness} color="#f5a623"/></div>
+      <div className="card"><div className="lab">Ambient light</div><div className="val">{cap(p.ambient_light)}</div></div>
+      <div className="card"><div className="lab">Suggestions</div><div className="val">{cap(p.suggestion_frequency)}</div></div>
+      <div className="card"><div className="lab">Cabin cooling</div><div className="val">{p.cabin_cooling_nudge?'On':'Off'}</div></div>
+    </div>
+    {p.break_recommendation && <div className="break">⚠ {p.message}</div>}
+    {!p.break_recommendation && <div className="muted" style={{marginTop:10}}>{p.message}</div>}
+  </div>);
+}
+
+function Metrics({m}){
+  if(!m) return null;
+  const rows = Object.values(m.models);
+  return (<div className="row" style={{marginTop:16}}>
+    <div className="panel grow"><h3>Model comparison</h3>
+      <table><thead><tr><th>Model</th><th>Accuracy</th><th>Macro-F1</th><th>ECE</th></tr></thead>
+      <tbody>{rows.map(r=>(<tr key={r.model}>
+        <td>{cap(r.model)} {r.model===m.serving_model && <span className="pill" style={{background:'rgba(57,211,83,.15)',color:'#39d353'}}>serving</span>}</td>
+        <td>{(r.accuracy*100).toFixed(1)}%</td><td>{(r.macro_f1*100).toFixed(1)}%</td><td>{r.ece.toFixed(3)}</td></tr>))}
+      </tbody></table>
+      <div className="muted" style={{marginTop:8,fontSize:12}}>ECE = calibration error (lower is better).</div>
+    </div>
+    <div className="panel grow"><h3>Signal drift · alert vs fatigued</h3>
+      <table><thead><tr><th>Signal</th><th>PSI</th><th>KS</th><th></th></tr></thead>
+      <tbody>{Object.entries(m.drift_alert_vs_fatigued).map(([k,v])=>(<tr key={k}>
+        <td>{k}</td><td>{v.psi}</td><td>{v.ks}</td>
+        <td><span className="pill" style={{background:'rgba(88,166,255,.15)',color:'#58a6ff'}}>{v.verdict}</span></td></tr>))}
+      </tbody></table>
+      <div className="muted" style={{marginTop:8,fontSize:12}}>High PSI = the signal strongly separates the states.</div>
+    </div>
+  </div>);
+}
+
+function App(){
+  const [idx,setIdx]=useState(0);
+  const [data,setData]=useState(null);
+  const [m,setM]=useState(null);
+  useEffect(()=>{fetch('/metrics').then(r=>r.json()).then(setM);},[]);
+  useEffect(()=>{fetch('/session/simulate?index='+idx).then(r=>r.json()).then(setData);},[idx]);
+  if(!data) return <div className="wrap">Loading…</div>;
+  const st = data.current_state;
+  const col = COLORS[st.fatigue_state];
+  return (<div className="wrap">
+    <div className="row" style={{justifyContent:'space-between',alignItems:'flex-end'}}>
+      <div><h1>Driver-State &amp; Adaptive Cockpit</h1>
+        <div className="sub">Sequence-model fatigue monitoring → live ADAS + cockpit adaptation ·
+          inspired by Alfa Driver Attention Assist, Lancia SALA, Ferrari psychophysical monitoring</div></div>
+      <div><button onClick={()=>setIdx(i=>Math.max(0,i-1))}>‹ Prev</button>{' '}
+        <button onClick={()=>setIdx(i=>i+1)}>Next ›</button></div>
+    </div>
+
+    <div className="row" style={{marginTop:16}}>
+      <div className="panel grow" style={{flex:2}}>
+        <div className="row" style={{justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <h3 style={{margin:0}}>Session {data.index} · {cap(data.road_type)} {data.is_night?'· night':''}</h3>
+          <div className="muted">window-level accuracy {(data.session_accuracy*100).toFixed(0)}%</div>
+        </div>
+        <Timeline data={data}/>
+      </div>
+      <div className="panel grow">
+        <h3>Current driver state</h3>
+        <span className="badge" style={{background:col+'22',color:col}}>
+          <span className="dot" style={{background:col}}/> {st.fatigue_state}</span>
+        <div className="kpi" style={{marginTop:14}}>
+          <div><span className="muted">Fatigue severity</span><b>{(st.fatigue_score*100).toFixed(0)}%</b></div>
+          <div><span className="muted">Confidence</span><b>{(st.confidence*100).toFixed(0)}%</b></div>
+          <div><span className="muted">Model</span><b>{cap(st.model)}</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div className="panel" style={{marginTop:16}}>
+      <h3>Adaptive cockpit &amp; ADAS response</h3>
+      <Cockpit policy={data.current_policy}/>
+    </div>
+
+    <Metrics m={m}/>
+    <div className="muted" style={{marginTop:18,fontSize:12,textAlign:'center'}}>
+      Synthetic data · driver_state · FastAPI + PyTorch (LSTM / Transformer)
+    </div>
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

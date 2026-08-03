@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.claude/
+
+# Generated data + trained models (reproducible via `python -m driver_state.cli train`)
+data/
+models/
+!data/.gitkeep

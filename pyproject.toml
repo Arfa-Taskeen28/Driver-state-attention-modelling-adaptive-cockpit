@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# Add project root to sys.path so bare `pytest` (e.g. in CI) imports driver_state.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
