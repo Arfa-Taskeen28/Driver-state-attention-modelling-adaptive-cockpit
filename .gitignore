@@ -6,6 +6,7 @@ __pycache__/
 .claude/
 
 # Generated data + trained models (reproducible via `python -m driver_state.cli train`)
-data/
-models/
-!data/.gitkeep
+# Anchored to root so docs/data/ (static demo JSON for GitHub Pages) is NOT ignored.
+/data/
+/models/
+!/data/.gitkeep
