@@ -1,5 +1,11 @@
 # Driver-State & Adaptive Cockpit
 
+**🟢 Live dashboard (GitHub Pages):**
+**[fauzan111.github.io/Driver-state-attention-modelling-adaptive-cockpit](https://fauzan111.github.io/Driver-state-attention-modelling-adaptive-cockpit/)**
+— replays sessions with live driver-state + adaptive cockpit (static, precomputed).
+The full app with live inference deploys to Hugging Face Spaces
+([see below](#deploy-the-live-app-hugging-face-spaces)).
+
 Estimates a driver's **fatigue state** from multimodal driving + physiological
 signals using **sequence models (LSTM / Transformer)**, then **adapts ADAS and
 cockpit settings** in real time through a transparent policy engine — served over
@@ -147,6 +153,32 @@ dashboard/index.html        single-file React + Chart.js dashboard
 tests/                      pytest suite
 Dockerfile · docker-compose.yml · .github/workflows/ci.yml
 ```
+
+## Deploy the live app (Hugging Face Spaces)
+
+GitHub Pages hosts the static dashboard; the **full app with live model inference**
+needs a Python host. PyTorch needs ~1 GB RAM, so use **Hugging Face Spaces**
+(free Docker Space, 16 GB RAM) rather than a 512 MB free tier.
+
+1. Create a new **Space** → SDK **Docker** → hardware **CPU basic (free)**.
+2. Put this front-matter at the top of the Space's `README.md`:
+   ```yaml
+   ---
+   title: Driver State Adaptive Cockpit
+   emoji: 🚗
+   colorFrom: indigo
+   colorTo: red
+   sdk: docker
+   app_port: 8000
+   ---
+   ```
+3. Add this repo's `Dockerfile`, `driver_state/`, `dashboard/`, `docker/` and
+   `requirements.txt` to the Space repo and `git push`. The image trains the model
+   at build (~8 min first time), then serves the dashboard + API.
+4. Open the Space URL — the dashboard runs against the live API (real inference).
+
+The `Dockerfile` already honours `$PORT` and bakes the model at build, so it works
+unchanged on Spaces (or any container host).
 
 ## Cloud-ready notes
 - **Training** maps to SageMaker / an EC2 GPU job; the pipeline is a single entrypoint.
